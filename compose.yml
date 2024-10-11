@@ -1,0 +1,40 @@
+---
+name: flight
+
+services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - --api.insecure=true
+      - --providers.docker
+      - --providers.docker.exposedByDefault=true
+      - --providers.docker.network=${FLIGHT_NETWORK?:}
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.asDefault=true
+      - --entrypoints.websecure.http.tls=true
+      - --serversTransport.insecureSkipVerify=true
+      - --providers.file.watch=true
+      - --providers.file.filename=/opt/flight/config/traefik.yml
+      - --providers.docker.defaultRule=Host(`{{ normalize .Name | replace "app-" "" }}.${FLIGHT_DOMAIN?:}`)
+    ports:
+      - ${FLIGHT_HTTP_PORT?:}:80
+      - ${FLIGHT_HTTPS_PORT?:}:443
+    volumes:
+      - traefik_data:/opt/flight/data
+      - ./traefik/config:/opt/flight/config
+      - ${FLIGHT_CERTS_DIR?:}:/opt/flight/certs
+      - ${FLIGHT_DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+    labels:
+      traefik.http.services.traefik.loadbalancer.server.port: 8080
+      traefik.http.routers.traefik.rule: "Host(`traefik.${FLIGHT_DOMAIN?:}`)"
+
+volumes:
+  traefik_data:
+
+networks:
+  default:
+    name: ${FLIGHT_NETWORK?:}

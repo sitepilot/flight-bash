@@ -1,0 +1,7 @@
+---
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /opt/flight/certs/ssl.crt
+        keyFile: /opt/flight/certs/ssl.key

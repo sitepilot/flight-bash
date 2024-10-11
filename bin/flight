@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -e
+set -u
+
+# Detect home directory
+FLIGHT_SCRIPT_DIR=$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
+FLIGHT_HOME_DIR=$(dirname "$FLIGHT_SCRIPT_DIR")
+
+# Load functions
+for FILE in "$FLIGHT_HOME_DIR"/lib/*.sh; do
+  # shellcheck disable=SC1090
+  source "$FILE"
+done
+
+# Setup environment
+flight_environment
+
+case ${1:-} in
+  up)
+    flight_up
+    ;;
+  down)
+    flight_down
+    ;;
+  secure)
+    flight_mkcert
+    flight_reboot
+    ;;
+  config)
+    flight_config
+    ;;
+  sync)
+    flight_sync "${@:2}"
+    ;;
+  php|composer|wp|node|npm)
+    flight_php "$@"
+    ;;
+  remote)
+    flight_remote "${@:2}"
+    ;;
+  destroy)
+    flight_destroy
+    ;;
+  *)
+    $DOCKER_COMPOSE "$@"
+    ;;
+esac
