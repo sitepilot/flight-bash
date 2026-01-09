@@ -30,15 +30,6 @@ case ${1:-} in
   config)
     flight_config
     ;;
-  sync)
-    flight_sync "${@:2}"
-    ;;
-  php|composer|wp|node|npm)
-    flight_php "$@"
-    ;;
-  remote)
-    flight_remote "${@:2}"
-    ;;
   destroy)
     flight_destroy
     ;;

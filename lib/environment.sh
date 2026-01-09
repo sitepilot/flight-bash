@@ -17,7 +17,6 @@ flight_environment() {
   export FLIGHT_NETWORK=${FLIGHT_NETWORK:-flight}
   export FLIGHT_HTTP_PORT=${FLIGHT_HTTP_PORT:-80}
   export FLIGHT_HTTPS_PORT=${FLIGHT_HTTPS_PORT:-443}
-  export FLIGHT_PHP_VERSION=${FLIGHT_PHP_VERSION:-"8.3"}
 
   # shellcheck disable=SC2034
   DOCKER_COMPOSE="docker compose -f $FLIGHT_HOME_DIR/compose.yml"
