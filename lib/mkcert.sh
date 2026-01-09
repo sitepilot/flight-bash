@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 flight_mkcert () {
-  if [ -f /proc/sys/fs/binfmt_misc/WSLInterop ]; then
+  if grep -qi microsoft /proc/sys/kernel/osrelease; then
     MKCERT="mkcert.exe"
   else
     MKCERT="mkcert"

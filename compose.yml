@@ -3,7 +3,7 @@ name: flight
 
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.6
     restart: unless-stopped
     command:
       - --api.insecure=true
@@ -31,13 +31,6 @@ services:
     labels:
       traefik.http.services.traefik.loadbalancer.server.port: 8080
       traefik.http.routers.traefik.rule: "Host(`traefik.${FLIGHT_DOMAIN?:}`)"
-
-  mailpit:
-    image: axllent/mailpit:latest
-    restart: unless-stopped
-    labels:
-      traefik.http.services.mailpit.loadbalancer.server.port: 8025
-      traefik.http.routers.mailpit.rule: "Host(`mailpit.${FLIGHT_DOMAIN?:}`)"
 
 volumes:
   traefik_data:
