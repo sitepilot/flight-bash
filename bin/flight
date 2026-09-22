@@ -47,7 +47,7 @@ function flight_down() {
   flight_compose down --remove-orphans
 }
 
-function fight_restart() {
+function flight_restart() {
   flight_compose up -d --remove-orphans --force-recreate
 }
 
