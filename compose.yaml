@@ -30,6 +30,7 @@ services:
       - ${FLIGHT_CERTS_DIR?:}:/opt/flight/certs
       - ${FLIGHT_DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
     labels:
+      traefik.enable: true
       traefik.http.services.traefik.loadbalancer.server.port: 8080
       traefik.http.routers.traefik.rule: "Host(`traefik.${FLIGHT_DOMAIN?:}`)"
 
