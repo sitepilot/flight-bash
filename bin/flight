@@ -1,43 +1,103 @@
 #!/usr/bin/env bash
+#
+# flight - local HTTPS development proxy, powered by Traefik and Docker.
+# https://github.com/sitepilot/flight-bash
 
-set -eu
+set -euo pipefail
+
+readonly FLIGHT_VERSION="2.0.0"
+readonly FLIGHT_COMPOSE_FILE="https://github.com/sitepilot/flight-bash.git#2.x"
 
 # Environment
-export FLIGHT_CONFIG_DIR=$HOME/.config/flight
+export FLIGHT_CONFIG_DIR=${FLIGHT_CONFIG_DIR:-$HOME/.config/flight}
 export FLIGHT_CERTS_DIR=$FLIGHT_CONFIG_DIR/certs
 export FLIGHT_ENV_FILE=$FLIGHT_CONFIG_DIR/.env
 export FLIGHT_SSL_KEY_FILE=$FLIGHT_CERTS_DIR/ssl.key
 export FLIGHT_SSL_CRT_FILE=$FLIGHT_CERTS_DIR/ssl.crt
 
-if [ -f "$FLIGHT_ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  source "$FLIGHT_ENV_FILE"
-fi
+function flight_die() {
+  printf 'flight: %s\n' "$*" >&2
+  exit 1
+}
 
-# Config
-export FLIGHT_DOMAIN=${FLIGHT_DOMAIN:-flght.dev}
+function flight_require() {
+  command -v "$1" > /dev/null 2>&1 || flight_die "$1 is required but was not found in PATH."
+}
 
-function flight_mkcert() {
-  if grep -qi microsoft /proc/sys/kernel/osrelease; then
-    MKCERT="mkcert.exe"
-  else
-    MKCERT="mkcert"
-  fi
-
+# Creates the configuration directory, writes a default environment file and
+# loads the configuration.
+function flight_init() {
   mkdir -p "$FLIGHT_CERTS_DIR"
 
-  $MKCERT -install -key-file="$FLIGHT_SSL_KEY_FILE" \
+  if [ ! -f "$FLIGHT_ENV_FILE" ]; then
+    cat > "$FLIGHT_ENV_FILE" <<'ENV'
+# Flight configuration, run `flight help` for the available settings.
+ENV
+  fi
+
+  # shellcheck disable=SC1090
+  source "$FLIGHT_ENV_FILE"
+
+  # Config
+  export FLIGHT_DOMAIN=${FLIGHT_DOMAIN:-flght.dev}
+}
+
+function flight_usage() {
+  cat <<USAGE
+flight - local HTTPS development proxy, powered by Traefik and Docker.
+
+Usage:
+  flight <command> [arguments]
+
+Commands:
+  up          Start the proxy, generating a certificate when missing
+  down        Stop the proxy and remove orphaned containers
+  restart     Recreate the proxy containers
+  secure      Regenerate the wildcard certificate and restart the proxy
+  help        Show this help
+  version     Show the flight version
+
+Any other command is passed through to docker compose:
+  flight ps
+  flight logs -f traefik
+
+Configuration ($FLIGHT_ENV_FILE):
+  FLIGHT_DOMAIN       Wildcard domain for the proxy (default: flght.dev)
+  FLIGHT_HTTP_PORT    Host port bound to HTTP (default: 80)
+  FLIGHT_HTTPS_PORT   Host port bound to HTTPS (default: 443)
+  FLIGHT_DOCKER_SOCK  Docker socket (default: /var/run/docker.sock)
+USAGE
+}
+
+function flight_compose() {
+  flight_init
+  flight_require docker
+
+  docker compose version > /dev/null 2>&1 \
+    || flight_die "the docker compose plugin is required but was not found."
+
+  docker compose -f "$FLIGHT_COMPOSE_FILE" --env-file "$FLIGHT_ENV_FILE" "$@"
+}
+
+function flight_mkcert() {
+  flight_init
+
+  local mkcert=mkcert
+
+  if grep -qi microsoft /proc/sys/kernel/osrelease 2> /dev/null; then
+    mkcert=mkcert.exe
+  fi
+
+  flight_require "$mkcert"
+
+  "$mkcert" -install -key-file="$FLIGHT_SSL_KEY_FILE" \
     -cert-file="$FLIGHT_SSL_CRT_FILE" \
     "*.${FLIGHT_DOMAIN}" > /dev/null
 }
 
-function flight_compose() {
-  docker compose -f https://github.com/sitepilot/flight-bash.git#2.x --env-file "$FLIGHT_ENV_FILE" "$@"
-}
-
 function flight_up() {
   if [ ! -f "$FLIGHT_SSL_KEY_FILE" ] || [ ! -f "$FLIGHT_SSL_CRT_FILE" ]; then
-    mkcert
+    flight_mkcert
   fi
 
   flight_compose up -d
@@ -51,6 +111,11 @@ function flight_restart() {
   flight_compose up -d --remove-orphans --force-recreate
 }
 
+function flight_secure() {
+  flight_mkcert
+  flight_restart
+}
+
 case ${1:-} in
   up)
     flight_up
@@ -58,9 +123,21 @@ case ${1:-} in
   down)
     flight_down
     ;;
-  secure)
-    flight_mkcert
+  restart)
     flight_restart
+    ;;
+  secure)
+    flight_secure
+    ;;
+  help | --help | -h)
+    flight_usage
+    ;;
+  version | --version | -v)
+    printf 'flight %s\n' "$FLIGHT_VERSION"
+    ;;
+  '')
+    flight_usage >&2
+    exit 1
     ;;
   *)
     flight_compose "$@"
