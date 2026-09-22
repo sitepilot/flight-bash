@@ -1,20 +1,55 @@
 #!/usr/bin/env bash
 
-set -e
-set -u
+set -eu
 
-# Detect home directory
-FLIGHT_SCRIPT_DIR=$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
-FLIGHT_HOME_DIR=$(dirname "$FLIGHT_SCRIPT_DIR")
+# Environment
+export FLIGHT_CONFIG_DIR=$HOME/.config/flight
+export FLIGHT_CERTS_DIR=$FLIGHT_CONFIG_DIR/certs
+export FLIGHT_ENV_FILE=$FLIGHT_CONFIG_DIR/.env
+export FLIGHT_SSL_KEY_FILE=$FLIGHT_CERTS_DIR/ssl.key
+export FLIGHT_SSL_CRT_FILE=$FLIGHT_CERTS_DIR/ssl.crt
 
-# Load functions
-for FILE in "$FLIGHT_HOME_DIR"/lib/*.sh; do
+if [ -f "$FLIGHT_ENV_FILE" ]; then
   # shellcheck disable=SC1090
-  source "$FILE"
-done
+  source "$FLIGHT_ENV_FILE"
+fi
 
-# Setup environment
-flight_environment
+# Config
+export FLIGHT_DOMAIN=${FLIGHT_DOMAIN:-flght.dev}
+
+function flight_mkcert() {
+  if grep -qi microsoft /proc/sys/kernel/osrelease; then
+    MKCERT="mkcert.exe"
+  else
+    MKCERT="mkcert"
+  fi
+
+  mkdir -p "$FLIGHT_CERTS_DIR"
+
+  $MKCERT -install -key-file="$FLIGHT_SSL_KEY_FILE" \
+    -cert-file="$FLIGHT_SSL_CRT_FILE" \
+    "*.${FLIGHT_DOMAIN}" > /dev/null
+}
+
+function flight_compose() {
+  docker compose -f https://github.com/sitepilot/flight-bash.git#2.x --env-file "$FLIGHT_ENV_FILE" "$@"
+}
+
+function flight_up() {
+  if [ ! -f "$FLIGHT_SSL_KEY_FILE" ] || [ ! -f "$FLIGHT_SSL_CRT_FILE" ]; then
+    mkcert
+  fi
+
+  flight_compose up -d
+}
+
+function flight_down() {
+  flight_compose down --remove-orphans
+}
+
+function fight_restart() {
+  flight_compose up -d --remove-orphans --force-recreate
+}
 
 case ${1:-} in
   up)
@@ -25,15 +60,9 @@ case ${1:-} in
     ;;
   secure)
     flight_mkcert
-    flight_reboot
-    ;;
-  config)
-    flight_config
-    ;;
-  destroy)
-    flight_destroy
+    flight_restart
     ;;
   *)
-    $DOCKER_COMPOSE "$@"
+    flight_compose "$@"
     ;;
 esac
